@@ -1,0 +1,154 @@
+AWSTemplateFormatVersion: '2010-09-09'
+# Sample CFN YAML to demonstrate creating a crawler
+#
+# Parameters section contains names that are substituted in the Resources section
+# These parameters are the names the resources created in the Data Catalog
+Parameters:                                                                                                       
+# The name of the crawler to be created
+  CFNCrawlerName:  
+    Type: String
+    Default: mankytest
+  CFNDatabaseName:
+    Type: String
+    Default: mankydbx
+  CFNTablePrefixName:
+    Type: String
+    Default: cfn_sample_1_	
+  CFNConnectionName:  
+    Type: String
+    Default: cfn-connection-mysql-flights-1
+  CFNJDBCString:  
+    Type: String
+    Default: "jdbc:postgresql://database-1.ch551uoolgup.us-east-1.rds.amazonaws.com:5432/datav"
+  CFNJDBCUser:  
+    Type: String
+    Default: "mk"
+  CFNJDBCPassword:  
+    Type: String
+    Default: "12345678"
+    NoEcho: true
+  CFNJobName:  
+    Type: String
+    Default: cfn-job-JDBC-to-S3-1
+# The name of the IAM role that the job assumes. It must have access to data, script, temporary directory
+  CFNIAMRoleName:  
+    Type: String
+    Default: AWSGlueServiceRoleGA
+# The S3 path where the script for this job is located
+  CFNScriptLocation:  
+    Type: String
+    Default: s3://mankybucket/final.py	
+
+#
+#
+#
+# Resources section defines metadata for the Data Catalog
+Resources:
+#Create IAM Role assumed by the crawler. For demonstration, this role is given all permissions.
+  CFNRoleFlights:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          -
+            Effect: "Allow"
+            Principal:
+              Service:
+                - "glue.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        -
+          PolicyName: "root"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              -
+                Effect: "Allow"
+                Action: "*"
+                Resource: "*"
+ # Create a database to contain tables created by the crawler
+  CFNDatabaseFlights:
+    Type: AWS::Glue::Database
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      DatabaseInput:
+        Name: !Ref CFNDatabaseName
+        Description: "AWS Glue container to hold metadata tables for the flights crawler"
+ #Create a crawler to crawl the flights data on a public S3 bucket
+  CFNCrawlerFlights:
+    Type: AWS::Glue::Crawler
+    Properties:
+      Name: !Ref CFNCrawlerName
+      Role: !GetAtt CFNRoleFlights.Arn
+      #Classifiers: none, use the default classifier
+      Description: AWS Glue crawler to crawl flights data
+      #Schedule: none, use default run-on-demand
+      DatabaseName: !Ref CFNDatabaseName
+      Targets:
+        S3Targets:
+          # Public S3 bucket with the flights data
+          - Path: "s3://mankybucket/sampledata"
+      TablePrefix: !Ref CFNTablePrefixName
+      SchemaChangePolicy:
+        UpdateBehavior: "UPDATE_IN_DATABASE"
+        DeleteBehavior: "LOG"
+      Schedule:
+        ScheduleExpression: "cron(0/6 * ? * * *)"
+        
+  CFNConnectionMySQL:
+    Type: AWS::Glue::Connection
+    Properties:
+      CatalogId: !Ref AWS::AccountId
+      ConnectionInput: 
+        Description: "Connect to postgresql database."
+        ConnectionType: "JDBC"
+        #MatchCriteria: none		
+        PhysicalConnectionRequirements:
+          AvailabilityZone: "us-east-1f"
+          SecurityGroupIdList: 
+           - "sg-4ea25115"
+          SubnetId: "subnet-4bb8bb44" 
+        ConnectionProperties: {
+          "JDBC_CONNECTION_URL": !Ref CFNJDBCString,
+          "USERNAME": !Ref CFNJDBCUser,
+          "PASSWORD": !Ref CFNJDBCPassword
+        }
+        Name: !Ref CFNConnectionName
+      
+  CFNJobFlights:
+    Type: AWS::Glue::Job   
+    Properties:
+      Name: !Ref CFNJobName
+      Role: !GetAtt CFNRoleFlights.Arn 
+      #DefaultArguments: JSON object  
+      # For example, if required by script, set temporary directory as DefaultArguments={'--TempDir'; 's3://aws-glue-temporary-xyc/sal'}
+      Command:   
+        Name: glueetl 
+        ScriptLocation: !Ref CFNScriptLocation
+      DefaultArguments:
+        "--job-bookmark-option": "job-bookmark-disable"
+             # for access to directories use proper IAM role with permission to buckets and folders that begin with "aws-glue-"					 
+             # if required, script defines temp directory as argument TempDir and used in script like redshift_tmp_dir = args["TempDir"] 
+             # script defines target for output as s3://aws-glue-target/sal 
+      Connections:
+        Connections:
+        - !Ref CFNConnectionName 
+      #MaxRetries: Double  
+      Description: Job created with CloudFormation using existing script
+      #LogUri: String  
+      MaxRetries: 0 
+      
+  ScheduledJobTrigger:
+    Type: AWS::Glue::Trigger
+    Properties:
+      Type: SCHEDULED
+      Description: DESCRIPTION_SCHEDULED
+      Schedule: "cron(0/10 * ? * * *)"
+      Actions:
+        - JobName: !Ref CFNJobName
+          Arguments:
+            '--job-bookmark-option': job-bookmark-disable
+      Name: prod-trigger1-scheduled
