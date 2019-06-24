@@ -1,0 +1,10 @@
+version: 0.1
+phases:
+  install:
+    commands:
+      - aws cloudformation package --template-file final.yml --s3-bucket mankybucket --output-template-file outputSamTemplate.yml
+artifacts:
+  type: zip
+  files:
+    - final.yml
+    - outputSamTemplate.yml
