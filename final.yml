@@ -7,7 +7,7 @@ Parameters:
 # The name of the crawler to be created
   CFNCrawlerName:  
     Type: String
-    Default: mankytest
+    Default: mankytest1
   CFNDatabaseName:
     Type: String
     Default: mankydbx
