@@ -37,7 +37,7 @@ Parameters:
 # The S3 path where the script for this job is located
   CFNScriptLocation:  
     Type: String
-    Default: s3://mankybucket/final.py	
+    Default: s3://mankybucket/final.py
 
 #
 #
