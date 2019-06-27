@@ -13,7 +13,7 @@ Parameters:
     Default: mankydbx
   CFNTablePrefixName:
     Type: String
-    Default: cfn_sample_1	
+    Default: cfn_sample_1_
   CFNConnectionName:  
     Type: String
     Default: cfn-connection-mysql-flights-1
